@@ -43,6 +43,11 @@ URL directa del modo proyector: `http://localhost:8765/?holo=1`.
 - **`pipeline`**: micrófono → transcripción → IA → voz. Más barato y permite reconocer quién habla,
   pero tarda 3–5 s. Se elige con `engine =` en el perfil.
 
+## Datos reales de la galaxia (EDSM)
+Mariner consulta [EDSM](https://www.edsm.net) (API pública, sin cuenta ni clave) para sistemas, estaciones,
+servicios, mercados, cuerpos, sistemas cercanos y distancias. Funciona con y sin el juego abierto.
+Los datos los aporta la comunidad: pueden tener algunas horas de antigüedad.
+
 ## Conducta y consumo
 - **Perfil** `profiles/<nombre>.toml`: personalidad, largo de respuestas, memoria, voz, avisos y modelos.
   Cada unidad elige el suyo con `PROFILE=` en `.env`.

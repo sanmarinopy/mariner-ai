@@ -16,8 +16,9 @@ Emit = Callable[[str], Awaitable[None]]
 ASSISTANT_MODE = """MODO ASISTENTE: en este momento no hay telemetría del juego conectada ({game} no está
 abierto o no envía datos). Actúa como asistente personal general: responde cualquier consulta
 (conocimiento general, explicaciones, ideas, cálculos, organización) y también dudas sobre {game},
-pero sin datos en vivo. Si te piden el estado de la nave u otros datos del juego en vivo, aclara
-brevemente que la telemetría no está conectada."""
+pero sin datos en vivo de la partida. Si te piden el estado de la nave, aclara brevemente que la
+telemetría no está conectada. Para datos de la galaxia del juego (sistemas, estaciones, mercados,
+distancias) usa las herramientas disponibles: son datos reales, no los inventes."""
 
 
 class Brain:
@@ -119,7 +120,7 @@ class Brain:
         user = {"role": "user", "content": text}
         messages: list[dict[str, Any]] = [{"role": "system", "content": self.system_prompt(speaker)}]
         messages += (self.history[-keep:] if keep else []) + [user]
-        tools = (self.pack.tools() if self.pack.telemetry_active() else None) or None
+        tools = self.pack.tools() or None
 
         reply = ""
         for _ in range(MAX_TOOL_ROUNDS):

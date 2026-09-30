@@ -3,13 +3,16 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 from typing import Any
 
 from ..base import GamePack
+from . import edsm
 from .journal import JournalWatcher
 from .state import ShipState
 
+log = logging.getLogger("mariner.elite")
 SCOOPABLE = set("KGBFOAM")
 # Sin escrituras del juego durante este tiempo se considera la telemetría desconectada
 TELEMETRY_TIMEOUT_S = 20 * 60  # clases estelares de las que se puede recoger combustible
@@ -17,8 +20,11 @@ TELEMETRY_TIMEOUT_S = 20 * 60  # clases estelares de las que se puede recoger co
 # Reglas propias del juego. La personalidad viene del perfil (profiles/*.toml).
 PERSONA = """Contexto: el comandante juega Elite Dangerous y tú eres la IA de su nave.
 - Usa el ESTADO DE LA NAVE adjunto; si falta un dato, dilo sin inventar.
-- Para mecánicas, módulos, ingeniería o sistemas responde con lo que sabes de Elite Dangerous
-  y aclara si algo puede haber cambiado con actualizaciones.
+- Para datos de la galaxia (sistemas, estaciones, servicios, mercados, cuerpos, distancias,
+  estrellas cercanas) usa las herramientas galaxy_*: son datos reales de EDSM. No los inventes;
+  si la herramienta no los tiene, dilo.
+- Para mecánicas, módulos o ingeniería responde con lo que sabes de Elite Dangerous y aclara que
+  puede haber cambiado con actualizaciones.
 - Si pide una acción física en la nave (tren de aterrizaje, salto, etc.) explica que aún
   no tienes control de mandos en esta versión.
 """
@@ -40,6 +46,7 @@ class Pack(GamePack):
         self._bridge_activity = 0.0  # modo bridge: última actividad informada por la PC gamer
         self._telemetry: bool | None = None
         self._monitor: asyncio.Task | None = None
+        self.edsm = edsm.EDSM()
 
     # ------------------------------------------------------------------ ciclo de vida
     async def start(self) -> None:
@@ -55,6 +62,7 @@ class Pack(GamePack):
             await self.watcher.stop()
         if self._monitor:
             self._monitor.cancel()
+        await self.edsm.close()
 
     # ------------------------------------------------------------------ ¿hay juego conectado?
     def telemetry_active(self) -> bool:
@@ -200,9 +208,21 @@ class Pack(GamePack):
                     },
                 },
             },
-        ]
+        ] + edsm.TOOLS
 
     async def call_tool(self, name: str, args: dict[str, Any]) -> str:
+        if name in edsm.TOOL_NAMES:
+            current = self.state.system if self.telemetry_active() else None
+            try:
+                data = await edsm.call(self.edsm, name, args, current)
+                return json.dumps({"fuente": "EDSM (datos reales de la comunidad)", **data}, ensure_ascii=False)
+            except edsm.EDSMError as e:
+                return json.dumps({"error": str(e)}, ensure_ascii=False)
+            except Exception as e:  # nunca romper la conversación por una consulta
+                log.exception("Error consultando EDSM")
+                return json.dumps({"error": f"Falla consultando EDSM: {type(e).__name__}"}, ensure_ascii=False)
+        if not self.telemetry_active() and name in ("get_ship_status", "get_recent_events"):
+            return json.dumps({"error": "Sin telemetría del juego: no hay datos en vivo de la nave."})
         if name == "get_ship_status":
             return json.dumps(self.state.summary(), ensure_ascii=False)
         if name == "get_recent_events":

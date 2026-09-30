@@ -72,6 +72,7 @@ def test_brain_tool_loop():
 
     pack = Pack(EventBus(), Settings(), noop)
     pack.state.apply_event({"event": "LoadGame", "FuelLevel": 16, "FuelCapacity": 32})
+    pack._session_open, pack.watcher = True, NS(last_activity=__import__("time").time())  # telemetría activa
     b = Brain(Settings(openai_api_key=""), pack)
     fake = FakeCompletions()
     b.client = NS(chat=NS(completions=fake))
@@ -348,3 +349,72 @@ def test_telemetry_switches_copilot_and_assistant_mode():
     pack.watcher.last_activity = _t.time()
     asyncio.run(pack.on_event({"event": "Shutdown"}))
     assert not pack.telemetry_active()
+
+
+# Respuestas reales de EDSM (recortadas), para probar sin red
+EDSM_SAMPLES = {
+    "/api-v1/system": {"name": "Sirius", "coords": {"x": 6.25, "y": -1.28125, "z": -5.75}, "requirePermit": True,
+                       "permitName": "Sirius", "information": {"allegiance": "Independent", "government": "Corporate",
+                       "faction": "Sirius Corporation", "factionState": "Expansion", "population": 2501068,
+                       "security": "High", "economy": "Industrial", "secondEconomy": "Extraction"},
+                       "primaryStar": {"type": "A (Blue-White) Star", "name": "Sirius", "isScoopable": True}},
+    "/api-system-v1/stations": {"name": "Sirius", "stations": [
+        {"type": "Coriolis Starport", "name": "Patterson Enterprise", "distanceToArrival": 4395, "economy": "Industrial",
+         "haveMarket": True, "haveShipyard": True, "haveOutfitting": True,
+         "otherServices": ["Refuel", "Repair", "Contacts", "Material Trader"],
+         "controllingFaction": {"name": "Sirius Corporation"}, "updateTime": {"information": "2026-09-21 14:08:13"}},
+        {"type": "Planetary Outpost", "name": "Stronghold Carrier", "distanceToArrival": 958, "economy": "High Tech",
+         "haveMarket": True, "otherServices": ["Refuel"], "controllingFaction": {"name": "Li Yong-Rui"}}]},
+    "/api-system-v1/stations/market": {"name": "Sirius", "sName": "Patterson Enterprise", "commodities": [
+        {"id": "algae", "name": "Algae", "buyPrice": 0, "stock": 0, "sellPrice": 573, "demand": 130864},
+        {"id": "gold", "name": "Gold", "buyPrice": 9000, "stock": 50, "sellPrice": 8800, "demand": 0}]},
+    "/api-v1/sphere-systems": [
+        {"distance": 0, "name": "Sirius", "information": {}, "primaryStar": {}},
+        {"distance": 8.59, "name": "Sol", "information": {"population": 18320926115, "economy": "Refinery",
+         "security": "High"}, "primaryStar": {"type": "G (White-Yellow) Star", "isScoopable": True}},
+        {"distance": 3.1, "name": "Brown Dwarf X", "information": {}, "primaryStar": {"type": "T", "isScoopable": False}}],
+}
+
+
+def _fake_edsm_pack():
+    async def noop(*a):
+        pass
+
+    s = Settings(openai_api_key="")
+    pack = Pack(EventBus(), s, noop)
+
+    async def fake_get(path, **params):
+        if path == "/api-v1/system" and params["systemName"] == "Sol":
+            return {"name": "Sol", "coords": {"x": 0, "y": 0, "z": 0}, "information": {}, "primaryStar": {}}
+        return EDSM_SAMPLES[path]
+
+    pack.edsm._get = fake_get
+    return pack
+
+
+def test_edsm_tools():
+    import json as _j
+    pack = _fake_edsm_pack()
+    assert {"galaxy_system", "galaxy_market", "galaxy_nearby"} <= {t["function"]["name"] for t in pack.tools()}
+
+    async def run():
+        # sin telemetría y sin sistema -> pide el nombre
+        r0 = _j.loads(await pack.call_tool("galaxy_system", {}))
+        # con telemetría usa el sistema actual
+        pack._session_open, pack.watcher = True, NS(last_activity=__import__("time").time())
+        pack.state.system = "Sirius"
+        r1 = _j.loads(await pack.call_tool("galaxy_system", {}))
+        r2 = _j.loads(await pack.call_tool("galaxy_stations", {"system": "Sirius"}))
+        r3 = _j.loads(await pack.call_tool("galaxy_market", {"station": "Patterson Enterprise", "commodity": "gold"}))
+        r4 = _j.loads(await pack.call_tool("galaxy_nearby", {"scoopable_only": True}))
+        r5 = _j.loads(await pack.call_tool("galaxy_distance", {"to_system": "Sol"}))
+        return r0, r1, r2, r3, r4, r5
+
+    r0, r1, r2, r3, r4, r5 = asyncio.run(run())
+    assert "error" in r0
+    assert r1["sistema"] == "Sirius" and r1["estrella_recargable"] and r1["fuente"].startswith("EDSM")
+    assert r2["estaciones"][0]["nombre"] == "Stronghold Carrier" and r2["estaciones"][0]["plataforma_grande"] is False
+    assert "Material Trader" in r2["estaciones"][1]["servicios"] and "Contacts" not in r2["estaciones"][1]["servicios"]
+    assert r3["resultado"][0]["producto"] == "Gold"
+    assert [x["sistema"] for x in r4["sistemas"]] == ["Sol"]
+    assert abs(r5["distancia_ly"] - 8.59) < 0.01
