@@ -28,6 +28,7 @@ Escribe preguntas en el cuadro inferior izquierdo: *"¿cuánto combustible nos q
 | `python -m mariner.tools.mic_test` | Lista micrófonos y mide el nivel para calibrar `VAD_THRESHOLD`. |
 | `python -m mariner.tools.enroll --name cristian` | Registra tu voz para que te reconozca (`SPEAKER_ID=true`). |
 | `python -m mariner.bridge --target ws://IP_PI:8765/bridge` | En la PC gamer: envía la telemetría a la Raspberry. |
+| `python -m mariner.tools.voices` | Escucha todas las voces con la misma frase para elegir. |
 | `python -m mariner.tools.bench --tts` | Mide tokens, latencia y costo con preguntas típicas (usa tu API key). |
 | `python -m mariner.tools.usage_report` | Resumen del consumo real registrado en `data/`. |
 | `python -m pytest` | Tests (instalar `pytest` antes). |
