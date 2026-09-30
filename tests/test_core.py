@@ -284,7 +284,7 @@ def test_realtime_engine_event_flow():
     e, a, said = asyncio.run(run())
     kinds = [k for k, _ in e.conn.sent]
     assert kinds == ["response.create", "item.create", "response.create"]
-    assert "ESTADO DE LA NAVE" in e.conn.sent[0][1]["response"]["instructions"]
+    assert "MODO ASISTENTE" in e.conn.sent[0][1]["response"]["instructions"]  # sin telemetría
     assert len(e.player.pushed) == 1 and e.mic.muted is False
     assert ("user.said", {"text": "¿Qué pasó?", "speaker": None}) in said
     assert any(d["text"] == "Nada grave, comandante." for k, d in said if k == "assistant.say")
@@ -319,3 +319,32 @@ def test_realtime_callout_uses_same_voice():
     r = sent[0]
     assert r["conversation"] == "none" and r["metadata"] == {"kind": "callout"}
     assert "Salto completado." in r["instructions"] and e.mic.muted is False
+
+
+def test_telemetry_switches_copilot_and_assistant_mode():
+    import time as _t
+
+    async def noop(*a):
+        pass
+
+    s = Settings(openai_api_key="")
+    pack = Pack(EventBus(), s, noop)
+    brain = Brain(s, pack)
+    pack.watcher = NS(last_activity=_t.time())
+
+    # sin sesión de juego -> asistente
+    assert not pack.telemetry_active() and "MODO ASISTENTE" in brain.system_prompt()
+    assert pack.hud()["title"] == "Modo asistente"
+
+    # el juego carga -> copiloto
+    asyncio.run(pack.on_event({"event": "LoadGame", "Commander": "X", "FuelLevel": 10, "FuelCapacity": 32}))
+    assert pack.telemetry_active() and "ESTADO DE LA NAVE" in brain.system_prompt()
+
+    # juego inactivo hace mucho -> asistente
+    pack.watcher.last_activity = _t.time() - 3 * 3600
+    assert not pack.telemetry_active()
+
+    # cierre del juego -> asistente
+    pack.watcher.last_activity = _t.time()
+    asyncio.run(pack.on_event({"event": "Shutdown"}))
+    assert not pack.telemetry_active()

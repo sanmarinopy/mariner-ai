@@ -27,11 +27,25 @@ async def run(target: str, folder: str) -> None:
     async def push(kind: str, data: dict) -> None:
         if queue.full():
             queue.get_nowait()
-        queue.put_nowait(json.dumps({"kind": kind, "data": data}))
+        msg = {"kind": kind, "data": data}
+        if kind == "heartbeat":
+            msg = {"kind": kind, **data}
+        queue.put_nowait(json.dumps(msg))
 
     watcher = JournalWatcher(folder, lambda e: push("journal", e), lambda s: push("status", s))
     watcher.start()
     log.info("Leyendo %s -> %s", folder, target)
+
+    async def heartbeat() -> None:
+        # cada 30 s: cuánto hace que el juego escribió algo (edad relativa: no depende de los relojes)
+        import time
+
+        while True:
+            await asyncio.sleep(30)
+            age = time.time() - watcher.last_activity if watcher.last_activity else 1e9
+            await push("heartbeat", {"age_s": round(age, 1)})
+
+    asyncio.create_task(heartbeat())
     async with aiohttp.ClientSession() as session:
         while True:
             try:

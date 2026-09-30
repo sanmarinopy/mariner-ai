@@ -204,8 +204,14 @@ class Assistant:
         if self.s.env_overrides:
             log.warning("El .env pisa al perfil en: %s  (vacíalos en .env para usar el perfil)",
                         ", ".join(self.s.env_overrides))
-        mode = "IA en línea" if self.s.has_openai else "modo sin conexión"
-        await self.callout(f"{self.s.assistant_name} en línea. Sistemas de {self.pack.name} conectados, {mode}.", 1)
+        await asyncio.sleep(1.0)  # que el lector de telemetría haga su primera lectura
+        if self.pack.telemetry_active():
+            modo = f"Telemetría de {self.pack.name} conectada. Modo copiloto."
+        else:
+            modo = "Sin telemetría del juego. Modo asistente."
+        if not self.s.has_openai:
+            modo += " Núcleo de IA sin conexión."
+        await self.callout(f"{self.s.assistant_name} en línea. {modo}", 1)
         try:
             await asyncio.gather(*tasks)
         finally:

@@ -36,6 +36,10 @@ class GamePack(abc.ABC):
     @abc.abstractmethod
     def persona(self) -> str: ...
 
+    def telemetry_active(self) -> bool:
+        """True si hay datos en vivo del juego. Sin telemetría, Mariner actúa como asistente general."""
+        return False
+
     def tools(self) -> list[dict[str, Any]]:
         return []
 

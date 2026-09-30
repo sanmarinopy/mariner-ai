@@ -43,7 +43,7 @@ history_turns = 6
 voice = "marin"
 # Acento (va primero en las instrucciones del modelo de voz). Ej.: "español rioplatense",
 # "español de México", "español latinoamericano neutro, como locutor de doblaje".
-accent = "español latinoamericano neutro, con la dicción clara de un locutor de doblaje latino"
+accent = "español argentino, con la dicción clara de un locutor de doblaje latino"
 # Cómo habla: tono, ritmo, emoción. Es texto libre.
 style = """Habla con naturalidad y fluidez, como una copiloto humana que conoce bien la nave.
 Ritmo conversacional, entonación expresiva y cálida, sin pausas robóticas entre frases.
@@ -51,7 +51,7 @@ Serena y segura; un poco más enérgica en las alertas."""
 # Efecto local sobre la voz (sin costo): none | nave | androide | robot
 effect = "androide"
 # Intensidad del efecto, de 0 a 1
-effect_mix = 0.4
+effect_mix = 0.3
 # Guarda en disco el audio de frases repetidas (avisos): no se paga dos veces.
 cache = true
 

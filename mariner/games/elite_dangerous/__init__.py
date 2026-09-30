@@ -1,6 +1,7 @@
 """Game Pack: Elite Dangerous (Horizons / Odyssey)."""
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from typing import Any
@@ -9,7 +10,9 @@ from ..base import GamePack
 from .journal import JournalWatcher
 from .state import ShipState
 
-SCOOPABLE = set("KGBFOAM")  # clases estelares de las que se puede recoger combustible
+SCOOPABLE = set("KGBFOAM")
+# Sin escrituras del juego durante este tiempo se considera la telemetría desconectada
+TELEMETRY_TIMEOUT_S = 20 * 60  # clases estelares de las que se puede recoger combustible
 
 # Reglas propias del juego. La personalidad viene del perfil (profiles/*.toml).
 PERSONA = """Contexto: el comandante juega Elite Dangerous y tú eres la IA de su nave.
@@ -33,6 +36,10 @@ class Pack(GamePack):
         self._hull_marks_said: set[int] = set()
         self._prev_flags: dict[str, bool] = {}
         self._last_hud = 0.0
+        self._session_open = False   # hay una sesión de juego abierta (LoadGame ... sin Shutdown)
+        self._bridge_activity = 0.0  # modo bridge: última actividad informada por la PC gamer
+        self._telemetry: bool | None = None
+        self._monitor: asyncio.Task | None = None
 
     # ------------------------------------------------------------------ ciclo de vida
     async def start(self) -> None:
@@ -41,12 +48,40 @@ class Pack(GamePack):
         else:
             self.watcher = JournalWatcher(self.settings.elite_journal_dir, self.on_event, self.on_status)
             self.watcher.start()
+        self._monitor = asyncio.create_task(self._watch_telemetry(), name="telemetry")
 
     async def stop(self) -> None:
         if self.watcher:
             await self.watcher.stop()
+        if self._monitor:
+            self._monitor.cancel()
+
+    # ------------------------------------------------------------------ ¿hay juego conectado?
+    def telemetry_active(self) -> bool:
+        if not self._session_open:
+            return False
+        last = self._bridge_activity if self.settings.game_source == "bridge" else (
+            self.watcher.last_activity if self.watcher else 0.0)
+        return time.time() - last < TELEMETRY_TIMEOUT_S
+
+    async def _watch_telemetry(self) -> None:
+        """Avisa cuando la telemetría se conecta o se pierde (el primer estado lo informa el arranque)."""
+        while True:
+            now = self.telemetry_active()
+            if self._telemetry is not None and now != self._telemetry:
+                if now:
+                    await self.callout("Telemetría de Elite Dangerous conectada. Modo copiloto activo.", 2)
+                else:
+                    await self.callout("Telemetría del juego desconectada. Paso a modo asistente.", 2)
+                await self._push_hud(force=True)
+            self._telemetry = now
+            await asyncio.sleep(3)
 
     async def _on_bridge(self, _topic: str, msg: dict[str, Any]) -> None:
+        if msg.get("kind") == "heartbeat":
+            self._bridge_activity = time.time() - float(msg.get("age_s", 1e9))
+            return
+        self._bridge_activity = time.time()
         if msg.get("kind") == "journal":
             await self.on_event(msg["data"])
         elif msg.get("kind") == "status":
@@ -54,6 +89,11 @@ class Pack(GamePack):
 
     # ------------------------------------------------------------------ telemetría
     async def on_event(self, ev: dict[str, Any]) -> None:
+        e = ev.get("event")
+        if e == "Shutdown":
+            self._session_open = False
+        elif e not in ("Fileheader", "Music"):
+            self._session_open = True
         self.state.apply_event(ev)
         if not ev.get("_replay"):
             await self._callouts_for_event(ev)
@@ -172,9 +212,15 @@ class Pack(GamePack):
 
     def hud(self) -> dict[str, Any]:
         s = self.state
+        if not self.telemetry_active():
+            return {"game": self.name, "title": "Modo asistente", "subtitle": "Sin telemetría del juego",
+                    "gauges": [{"id": "fuel", "label": "COMB", "value": None},
+                               {"id": "hull", "label": "CASCO", "value": None}],
+                    "alerts": [], "shields": None, "telemetry": False}
         return {
             "game": self.name,
-            "title": s.system or "Sin telemetría",
+            "telemetry": True,
+            "title": s.system or "Sin datos de navegación",
             "subtitle": s.station or s.body or (s.ship_name or s.ship or ""),
             "gauges": [
                 {"id": "fuel", "label": "COMB", "value": s.fuel_pct},
@@ -185,6 +231,9 @@ class Pack(GamePack):
         }
 
     def offline_reply(self, text: str) -> str:
+        if not self.telemetry_active():
+            return ("Modo asistente sin conexión: no hay telemetría del juego ni núcleo de IA. "
+                    "Configure la clave de OpenAI para conversar.")
         t = text.lower()
         s = self.state.summary()
         parts: list[str] = []

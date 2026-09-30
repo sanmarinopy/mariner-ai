@@ -13,6 +13,12 @@ log = logging.getLogger("mariner.brain")
 MAX_TOOL_ROUNDS = 4
 Emit = Callable[[str], Awaitable[None]]
 
+ASSISTANT_MODE = """MODO ASISTENTE: en este momento no hay telemetría del juego conectada ({game} no está
+abierto o no envía datos). Actúa como asistente personal general: responde cualquier consulta
+(conocimiento general, explicaciones, ideas, cálculos, organización) y también dudas sobre {game},
+pero sin datos en vivo. Si te piden el estado de la nave u otros datos del juego en vivo, aclara
+brevemente que la telemetría no está conectada."""
+
 
 class Brain:
     def __init__(self, settings: Settings, pack: GamePack, usage=None) -> None:
@@ -32,8 +38,12 @@ class Brain:
         rules = (f"Responde en idioma '{s.language}', en {s.max_sentences} frases como máximo. "
                  "Nada de listas ni markdown: todo se convierte en voz.")
         # Orden pensado para el caché de OpenAI: lo fijo primero, lo que cambia (estado) al final.
-        parts = [s.personality.format(name=s.assistant_name).strip(), self.pack.persona(), rules,
-                 self.pack.context()]
+        if self.pack.telemetry_active():
+            parts = [s.personality.format(name=s.assistant_name).strip(), self.pack.persona(), rules,
+                     self.pack.context()]
+        else:
+            parts = [s.personality.format(name=s.assistant_name).strip(), ASSISTANT_MODE.format(game=self.pack.name),
+                     rules]
         if speaker:
             parts.append(f"Quien te habla ahora fue identificado por voz como: {speaker}.")
         return "\n\n".join(p for p in parts if p)
@@ -109,7 +119,7 @@ class Brain:
         user = {"role": "user", "content": text}
         messages: list[dict[str, Any]] = [{"role": "system", "content": self.system_prompt(speaker)}]
         messages += (self.history[-keep:] if keep else []) + [user]
-        tools = self.pack.tools() or None
+        tools = (self.pack.tools() if self.pack.telemetry_active() else None) or None
 
         reply = ""
         for _ in range(MAX_TOOL_ROUNDS):

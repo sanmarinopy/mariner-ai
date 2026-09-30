@@ -41,6 +41,7 @@ class JournalWatcher:
         self._status_mtime = 0.0
         self._task: asyncio.Task | None = None
         self._warned = False
+        self.last_activity = 0.0  # epoch de la última escritura del juego (journal o Status.json)
 
     def start(self) -> None:
         self._task = asyncio.create_task(self._run(), name="journal-watcher")
@@ -75,6 +76,7 @@ class JournalWatcher:
         latest = self._latest_journal()
         if latest is None:
             return
+        self.last_activity = max(self.last_activity, latest.stat().st_mtime)
         if latest != self._file:
             log.info("Siguiendo journal: %s", latest.name)
             self._file, self._pos, self._buf = latest, 0, ""
@@ -116,6 +118,7 @@ class JournalWatcher:
         if not p.exists():
             return
         m = p.stat().st_mtime
+        self.last_activity = max(self.last_activity, m)
         if m == self._status_mtime:
             return
         self._status_mtime = m
