@@ -1,0 +1,22 @@
+[Unit]
+Description=Mariner - pantalla del holograma (cage + Chromium kiosk)
+After=mariner.service systemd-user-sessions.service
+Wants=mariner.service
+Conflicts=getty@tty1.service
+
+[Service]
+User=__USER__
+PAMName=login
+TTYPath=/dev/tty1
+StandardInput=tty
+StandardOutput=journal
+Environment=XDG_RUNTIME_DIR=/run/user/__UID__
+ExecStartPre=/bin/sleep 3
+ExecStart=/usr/bin/cage -s -- __CHROMIUM__ --kiosk --noerrdialogs --disable-infobars --incognito \
+  --no-first-run --disable-features=Translate --autoplay-policy=no-user-gesture-required \
+  http://localhost:8765/?holo=1
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=graphical.target multi-user.target

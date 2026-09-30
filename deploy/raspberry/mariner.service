@@ -1,0 +1,16 @@
+[Unit]
+Description=Mariner - nucleo del asistente
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+User=__USER__
+WorkingDirectory=__DIR__
+EnvironmentFile=__DIR__/.env
+Environment=XDG_RUNTIME_DIR=/run/user/__UID__
+ExecStart=__DIR__/.venv/bin/python -m mariner --no-browser --voice
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
