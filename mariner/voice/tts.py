@@ -11,6 +11,7 @@ import numpy as np
 
 from ..config import Settings
 from ..core.events import EventBus
+from . import effects
 
 log = logging.getLogger("mariner.tts")
 TTS_RATE = 24000  # response_format="pcm" -> 24 kHz, 16 bit, mono
@@ -66,6 +67,8 @@ class Voice:
             try:
                 data, _ = await self.synthesize(text)
                 pcm = np.frombuffer(data, dtype="<i2").astype(np.float32) / 32768.0
+                # el efecto se aplica al reproducir: la caché guarda la voz limpia
+                pcm = effects.apply(pcm, self.s.tts_effect, self.s.tts_effect_mix)
             except Exception:
                 log.exception("Falló la síntesis de voz; sigo sólo con texto")
         if pcm is None:

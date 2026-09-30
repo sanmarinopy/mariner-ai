@@ -67,6 +67,8 @@ class Settings:
     tts_voice: str = "nova"
     tts_style: str = ""
     tts_cache: bool = True
+    tts_effect: str = "none"
+    tts_effect_mix: float = 1.0
 
     # --- Identificación de hablante ---
     speaker_id: bool = False
@@ -105,6 +107,8 @@ _PROFILE_MAP = {
     "tts_voice": ("voice", "voice"),
     "tts_style": ("voice", "style"),
     "tts_cache": ("voice", "cache"),
+    "tts_effect": ("voice", "effect"),
+    "tts_effect_mix": ("voice", "effect_mix"),
     "callouts_enabled": ("callouts", "enabled"),
     "callouts_muted": ("callouts", "muted"),
     "chat_model": ("models", "chat"),
@@ -120,6 +124,7 @@ _ENV_MAP = {
     "game_pack": "GAME_PACK", "game_source": "GAME_SOURCE", "elite_journal_dir": "ELITE_JOURNAL_DIR",
     "openai_api_key": "OPENAI_API_KEY", "chat_model": "OPENAI_CHAT_MODEL", "stt_model": "OPENAI_STT_MODEL",
     "tts_model": "OPENAI_TTS_MODEL", "tts_voice": "OPENAI_TTS_VOICE", "tts_style": "OPENAI_TTS_STYLE",
+    "tts_effect": "TTS_EFFECT",
     "speaker_id": "SPEAKER_ID", "speaker_model": "OPENAI_SPEAKER_MODEL", "voices_dir": "VOICES_DIR",
     "only_known_speakers": "ONLY_KNOWN_SPEAKERS", "mic_device": "MIC_DEVICE",
     "vad_threshold": "VAD_THRESHOLD", "vad_silence_ms": "VAD_SILENCE_MS",

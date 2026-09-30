@@ -132,3 +132,13 @@ def test_reasoning_effort_fallback():
     assert asyncio.run(b.ask("hola")) == "ok"
     assert asyncio.run(b.ask("hola")) == "ok"
     assert calls == ["low", "none", "none"]
+
+
+def test_voice_effects():
+    import numpy as np
+    from mariner.voice import effects
+
+    x = (0.5 * np.sin(np.linspace(0, 400, 24000))).astype(np.float32)
+    for p in effects.PRESETS:
+        y = effects.apply(x, p)
+        assert y.shape == x.shape and np.isfinite(y).all() and abs(float(np.abs(y).max()) - 0.5) < 1e-3
