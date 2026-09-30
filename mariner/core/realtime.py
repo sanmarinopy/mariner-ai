@@ -115,8 +115,10 @@ class RealtimeEngine:
                 self._ready.set()
                 await asyncio.gather(self._send_audio(), self._events(), self._levels())
         finally:
+            self.conn = None
             self.mic.stop()
             self.player.stop()
+            self.player = None
 
     async def _send_audio(self) -> None:
         async for frame in self.mic.frames():
@@ -205,6 +207,8 @@ class RealtimeEngine:
     async def send_text(self, text: str) -> None:
         """Mensaje escrito desde la interfaz."""
         await self._ready.wait()
+        if self.conn is None:
+            return
         self._t_stop = time.monotonic()
         await self.a.set_state("thinking")
         await self.conn.conversation.item.create(
@@ -216,6 +220,8 @@ class RealtimeEngine:
         if pcm is None:
             return
         await self._ready.wait()
+        if self.conn is None or self.player is None:
+            return
         self.mic.muted = True
         self.player.push(pcm)
         await self._finish()

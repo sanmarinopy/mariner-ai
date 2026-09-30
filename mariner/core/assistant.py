@@ -145,6 +145,33 @@ class Assistant:
                 continue
             asyncio.create_task(self.handle_user_text(text, speaker))
 
+    async def _start_pipeline_voice(self) -> None:
+        from ..voice.mic import Microphone
+        from ..voice.stt import Transcriber
+
+        try:
+            self.mic = Microphone(self.s.mic_device or None, self.s.vad_threshold, self.s.vad_silence_ms)
+            self.stt = Transcriber(self.s, self.usage)
+            self.mic.start()
+        except Exception:
+            log.exception("No pude abrir el micrófono. La interfaz sigue funcionando por texto.")
+            self.mic = None
+            return
+        await self._listen_loop()
+
+    async def _run_realtime(self) -> None:
+        """Tiempo real; si falla (red, modelo, audio), sigue en modo clásico en vez de cerrarse."""
+        try:
+            await self.engine.run()
+        except Exception as e:
+            log.exception("Falló el modo tiempo real (%s). Sigo en modo clásico.", type(e).__name__)
+        eng, self.engine = self.engine, None
+        if eng is not None:
+            eng._ready.set()  # libera a quien estuviera esperando la conexión
+        self.mic = None
+        await self.callout("Enlace de voz en tiempo real caído. Continúo en modo clásico.", 2)
+        await self._start_pipeline_voice()
+
     async def run(self, voice_input: bool) -> None:
         from ..games.base import load_pack
         from ..voice.tts import Voice
@@ -166,15 +193,9 @@ class Assistant:
                 from .realtime import RealtimeEngine
 
                 self.engine = RealtimeEngine(self)
-                tasks.append(asyncio.create_task(self.engine.run(), name="realtime"))
+                tasks.append(asyncio.create_task(self._run_realtime(), name="realtime"))
             else:
-                from ..voice.mic import Microphone
-                from ..voice.stt import Transcriber
-
-                self.mic = Microphone(self.s.mic_device or None, self.s.vad_threshold, self.s.vad_silence_ms)
-                self.stt = Transcriber(self.s, self.usage)
-                self.mic.start()
-                tasks.append(asyncio.create_task(self._listen_loop(), name="listen"))
+                tasks.append(asyncio.create_task(self._start_pipeline_voice(), name="listen"))
 
         log.info("Unidad %s · perfil %s · motor %s · modelo %s · voz %s · efecto %s", self.s.device_id,
                  self.s.profile, "tiempo real" if self.engine else "clásico",

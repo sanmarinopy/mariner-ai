@@ -55,9 +55,13 @@ async def amain(args) -> None:
 
 def main(argv=None) -> None:
     args = parse_args(argv)
+    (ROOT / "data").mkdir(exist_ok=True)
+    handlers = [logging.StreamHandler(),
+                logging.FileHandler(ROOT / "data" / "mariner.log", mode="w", encoding="utf-8")]
     logging.basicConfig(
         level=logging.DEBUG if args.debug else logging.INFO,
         format="%(asctime)s %(levelname)-7s %(name)s: %(message)s", datefmt="%H:%M:%S",
+        handlers=handlers,
     )
     for noisy in ("httpx", "openai", "aiohttp.access"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
