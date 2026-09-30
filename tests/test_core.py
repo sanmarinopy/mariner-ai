@@ -142,3 +142,11 @@ def test_voice_effects():
     for p in effects.PRESETS:
         y = effects.apply(x, p)
         assert y.shape == x.shape and np.isfinite(y).all() and abs(float(np.abs(y).max()) - 0.5) < 1e-3
+
+
+def test_env_override_is_reported(monkeypatch):
+    from mariner.config import load_settings
+
+    monkeypatch.setenv("OPENAI_TTS_VOICE", "nova")
+    s = load_settings("default")
+    assert any(o.startswith("OPENAI_TTS_VOICE=nova") for o in s.env_overrides)

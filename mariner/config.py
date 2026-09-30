@@ -88,6 +88,8 @@ class Settings:
     # --- Datos locales (consumo, caché de voz) ---
     data_dir: str = str(ROOT / "data")
     pricing: dict[str, Any] = field(default_factory=dict)
+    # variables de entorno que pisaron un valor del perfil (para avisar al arrancar)
+    env_overrides: list[str] = field(default_factory=list)
 
     @property
     def has_openai(self) -> bool:
@@ -156,7 +158,10 @@ def load_settings(profile: str | None = None) -> Settings:
     for name, env in _ENV_MAP.items():
         v = os.getenv(env)
         if v not in (None, ""):
-            setattr(s, name, _coerce(v, getattr(s, name)))
+            new = _coerce(v, getattr(s, name))
+            if name in _PROFILE_MAP and new != getattr(s, name) and name != "openai_api_key":
+                s.env_overrides.append(f"{env}={v if len(str(v)) < 40 else str(v)[:37] + '...'}")
+            setattr(s, name, new)
     if not s.elite_journal_dir:
         s.elite_journal_dir = _default_journal_dir()
     s.pricing = _load_toml(PROFILES / "pricing.toml")

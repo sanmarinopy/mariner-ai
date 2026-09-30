@@ -129,7 +129,11 @@ class Assistant:
                 self.mic.start()
                 tasks.append(asyncio.create_task(self._listen_loop(), name="listen"))
 
-        log.info("Unidad %s · perfil %s · modelo %s", self.s.device_id, self.s.profile, self.s.chat_model)
+        log.info("Unidad %s · perfil %s · modelo %s · voz %s · efecto %s", self.s.device_id, self.s.profile,
+                 self.s.chat_model, self.s.tts_voice, self.s.tts_effect)
+        if self.s.env_overrides:
+            log.warning("El .env pisa al perfil en: %s  (vacíalos en .env para usar el perfil)",
+                        ", ".join(self.s.env_overrides))
         mode = "IA en línea" if self.s.has_openai else "modo sin conexión"
         await self.callout(f"{self.s.assistant_name} en línea. Sistemas de {self.pack.name} conectados, {mode}.", 1)
         try:
