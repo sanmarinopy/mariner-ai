@@ -3,13 +3,15 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+import re
+from typing import Any, Awaitable, Callable
 
 from ..config import Settings
 from ..games.base import GamePack
 
 log = logging.getLogger("mariner.brain")
 MAX_TOOL_ROUNDS = 4
+Emit = Callable[[str], Awaitable[None]]
 
 
 class Brain:
@@ -55,9 +57,52 @@ class Brain:
                             kwargs["model"], self._effort, nuevo or "(sin parámetro)")
                 self._effort = nuevo
 
-    async def ask(self, text: str, speaker: str | None = None) -> str:
+    async def _round(self, kwargs: dict[str, Any], emit: Emit | None):
+        """Una vuelta con el modelo. Devuelve (texto, resto_sin_emitir, tool_calls).
+
+        Con emit: usa streaming y entrega cada frase apenas está completa, para que la voz
+        empiece a hablar mientras el modelo sigue escribiendo."""
+        model = kwargs["model"]
+        if emit is None:
+            resp = await self._create(kwargs)
+            if self.usage:
+                await self.usage.chat(model, getattr(resp, "usage", None))
+            msg = resp.choices[0].message
+            calls = [{"id": c.id, "name": c.function.name, "arguments": c.function.arguments or ""}
+                     for c in (msg.tool_calls or [])]
+            return msg.content or "", "", calls
+
+        stream = await self._create(dict(kwargs, stream=True, stream_options={"include_usage": True}))
+        content, buf, usage = "", "", None
+        calls: dict[int, dict[str, str]] = {}
+        async for chunk in stream:
+            if getattr(chunk, "usage", None):
+                usage = chunk.usage
+            if not chunk.choices:
+                continue
+            d = chunk.choices[0].delta
+            if getattr(d, "content", None):
+                content += d.content
+                buf += d.content
+                buf = await _emit_sentences(buf, emit)
+            for tc in getattr(d, "tool_calls", None) or []:
+                c = calls.setdefault(tc.index, {"id": "", "name": "", "arguments": ""})
+                if tc.id:
+                    c["id"] = tc.id
+                if tc.function is not None:
+                    c["name"] += tc.function.name or ""
+                    c["arguments"] += tc.function.arguments or ""
+        if self.usage:
+            await self.usage.chat(model, usage)
+        return content, buf, [calls[k] for k in sorted(calls)]
+
+    async def ask(self, text: str, speaker: str | None = None, emit: Emit | None = None) -> str:
+        """Responde a `text`. Si se pasa `emit`, cada frase se entrega apenas está lista."""
         if not self.client:
-            return self.pack.offline_reply(text)
+            reply = self.pack.offline_reply(text)
+            if emit:
+                await emit(reply)
+            return reply
 
         s = self.settings
         keep = max(0, s.history_turns) * 2
@@ -72,35 +117,44 @@ class Brain:
                                       "max_completion_tokens": s.max_reply_tokens}
             if tools:
                 kwargs["tools"] = tools
-            resp = await self._create(kwargs)
-            if self.usage:
-                await self.usage.chat(s.chat_model, getattr(resp, "usage", None))
-            msg = resp.choices[0].message
-            if not msg.tool_calls:
-                reply = (msg.content or "").strip()
+            content, rest, calls = await self._round(kwargs, emit)
+            if not calls:
+                reply = content.strip()
+                if emit and rest.strip():
+                    await emit(rest.strip())
                 break
-            messages.append(
-                {
-                    "role": "assistant",
-                    "content": msg.content or "",
-                    "tool_calls": [
-                        {"id": c.id, "type": "function",
-                         "function": {"name": c.function.name, "arguments": c.function.arguments}}
-                        for c in msg.tool_calls
-                    ],
-                }
-            )
-            for call in msg.tool_calls:
+            messages.append({
+                "role": "assistant", "content": content or "",
+                "tool_calls": [{"id": c["id"], "type": "function",
+                                "function": {"name": c["name"], "arguments": c["arguments"]}} for c in calls],
+            })
+            for c in calls:
                 try:
-                    args = json.loads(call.function.arguments or "{}")
+                    args = json.loads(c["arguments"] or "{}")
                 except json.JSONDecodeError:
                     args = {}
-                log.info("tool -> %s(%s)", call.function.name, args)
-                result = await self.pack.call_tool(call.function.name, args)
-                messages.append({"role": "tool", "tool_call_id": call.id, "content": result})
+                log.info("tool -> %s(%s)", c["name"], args)
+                result = await self.pack.call_tool(c["name"], args)
+                messages.append({"role": "tool", "tool_call_id": c["id"], "content": result})
         if not reply:
             reply = "Perdí el hilo de los sistemas, comandante. ¿Puede repetir?"
+            if emit:
+                await emit(reply)
 
         self.history += [user, {"role": "assistant", "content": reply}]
         self.history = self.history[-keep:] if keep else []
         return reply
+
+
+_SENTENCE_END = re.compile(r"[.!?…](?=\s)")
+MIN_SENTENCE = 18  # no cortar en frases muy cortas ("Sí.") para que la voz suene continua
+
+
+async def _emit_sentences(buf: str, emit: Emit) -> str:
+    while True:
+        m = _SENTENCE_END.search(buf, MIN_SENTENCE)
+        if not m:
+            return buf
+        sentence, buf = buf[: m.end()].strip(), buf[m.end():].lstrip()
+        if sentence:
+            await emit(sentence)

@@ -150,3 +150,50 @@ def test_env_override_is_reported(monkeypatch):
     monkeypatch.setenv("OPENAI_TTS_VOICE", "nova")
     s = load_settings("default")
     assert any(o.startswith("OPENAI_TTS_VOICE=nova") for o in s.env_overrides)
+
+
+def test_brain_streaming_emits_sentences():
+    """Streaming: una vuelta con herramienta y otra con texto; las frases salen de a una."""
+
+    def chunk(content=None, tool=None, usage=None, empty=False):
+        if empty:
+            return NS(choices=[], usage=usage)
+        return NS(usage=None, choices=[NS(delta=NS(content=content, tool_calls=[tool] if tool else None))])
+
+    class Stream:
+        def __init__(self, items):
+            self.items = items
+
+        def __aiter__(self):
+            async def gen():
+                for i in self.items:
+                    yield i
+            return gen()
+
+    class FakeStreaming:
+        def __init__(self):
+            self.n = 0
+
+        async def create(self, **kw):
+            assert kw["stream"] is True
+            self.n += 1
+            if self.n == 1:
+                tc = NS(index=0, id="c1", function=NS(name="get_recent_events", arguments='{"count": 2}'))
+                return Stream([chunk(tool=tc), chunk(empty=True, usage=None)])
+            parts = ["Salto completado, coman", "dante. Combustible al cin", "cuenta por ciento. ", "Todo en orden."]
+            return Stream([chunk(p) for p in parts] + [chunk(empty=True)])
+
+    async def noop(*a):
+        pass
+
+    s = Settings(openai_api_key="")
+    b = Brain(s, Pack(EventBus(), s, noop))
+    b.client = NS(chat=NS(completions=FakeStreaming()))
+    got = []
+
+    async def emit(x):
+        got.append(x)
+
+    out = asyncio.run(b.ask("¿estado?", emit=emit))
+    assert got == ["Salto completado, comandante.", "Combustible al cincuenta por ciento.", "Todo en orden."]
+    assert out.startswith("Salto completado") and b.history[-1]["content"] == out

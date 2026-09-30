@@ -79,7 +79,7 @@ class Settings:
     # --- Audio ---
     mic_device: str = ""
     vad_threshold: float = 0.015
-    vad_silence_ms: int = 900
+    vad_silence_ms: int = 600
 
     # --- Interfaz ---
     host: str = "127.0.0.1"

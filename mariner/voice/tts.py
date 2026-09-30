@@ -61,20 +61,27 @@ class Voice:
             await self.usage.tts(self.s.tts_model, len(data) / 2 / TTS_RATE, len(text), cached)
         return data, cached
 
-    async def speak(self, text: str) -> None:
-        pcm = None
-        if self.client and self.sd:
-            try:
-                data, _ = await self.synthesize(text)
-                pcm = np.frombuffer(data, dtype="<i2").astype(np.float32) / 32768.0
-                # el efecto se aplica al reproducir: la caché guarda la voz limpia
-                pcm = effects.apply(pcm, self.s.tts_effect, self.s.tts_effect_mix)
-            except Exception:
-                log.exception("Falló la síntesis de voz; sigo sólo con texto")
+    async def prepare(self, text: str) -> np.ndarray | None:
+        """Genera el audio listo para reproducir (con efecto). None = sin audio (sólo texto)."""
+        if not (self.client and self.sd):
+            return None
+        try:
+            data, _ = await self.synthesize(text)
+            pcm = np.frombuffer(data, dtype="<i2").astype(np.float32) / 32768.0
+            # el efecto se aplica acá: la caché guarda la voz limpia
+            return effects.apply(pcm, self.s.tts_effect, self.s.tts_effect_mix)
+        except Exception:
+            log.exception("Falló la síntesis de voz; sigo sólo con texto")
+            return None
+
+    async def play(self, pcm: np.ndarray | None, text: str) -> None:
         if pcm is None:
             await self._fake_levels(text)
-            return
-        await self._play(pcm)
+        else:
+            await self._play(pcm)
+
+    async def speak(self, text: str) -> None:
+        await self.play(await self.prepare(text), text)
 
     async def _play(self, pcm: np.ndarray) -> None:
         step = TTS_RATE * LEVEL_MS // 1000

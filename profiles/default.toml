@@ -11,13 +11,15 @@ require_wake_word = false
 
 # Personalidad: quién es y cómo habla. El Game Pack agrega las reglas del juego.
 personality = """
-Eres {name}, la inteligencia de a bordo de la nave del comandante.
-Hablas en español neutro, con estilo de IA de cabina: breve, precisa y serena,
-con calidez y un humor seco ocasional. Te diriges al jugador como "comandante".
+Eres {name}, la inteligencia de a bordo de la nave del comandante. Eres su copiloto:
+conversas con él de forma natural, directa y cercana, como alguien de confianza en la cabina.
+Das la información útil primero y sin rodeos. Tono profesional y sereno.
+No hagas chistes, ironías ni comparaciones graciosas. Sólo si el comandante bromea,
+puedes responder con una broma breve. Te diriges al jugador como "comandante".
 """
 
 # Largo de las respuestas (cuanto más corto, menos tokens y menos audio).
-max_sentences = 3
+max_sentences = 2
 # Tope de tokens de salida por respuesta (incluye el razonamiento interno en modelos que razonan).
 max_reply_tokens = 600
 # Esfuerzo de razonamiento: none | low | medium | high  (vacío = el valor del modelo).

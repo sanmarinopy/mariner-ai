@@ -146,15 +146,9 @@ class Pack(GamePack):
         return "ESTADO DE LA NAVE (tiempo real): " + json.dumps(self.state.summary(), ensure_ascii=False)
 
     def tools(self) -> list[dict[str, Any]]:
+        # El estado de la nave ya viaja en cada pregunta (context()); no se ofrece como herramienta
+        # para evitar una vuelta extra al modelo (~1 s). get_ship_status sigue disponible en call_tool.
         return [
-            {
-                "type": "function",
-                "function": {
-                    "name": "get_ship_status",
-                    "description": "Devuelve el estado actual completo de la nave del comandante.",
-                    "parameters": {"type": "object", "properties": {}},
-                },
-            },
             {
                 "type": "function",
                 "function": {
