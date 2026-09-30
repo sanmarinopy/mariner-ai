@@ -20,12 +20,13 @@ def parse_args(argv=None):
     p.add_argument("--no-browser", action="store_true", help="No abrir el navegador automáticamente")
     p.add_argument("--host", help="IP donde escuchar (0.0.0.0 para aceptar el bridge desde otra PC)")
     p.add_argument("--port", type=int)
+    p.add_argument("--profile", help="Perfil de conducta (profiles/<nombre>.toml)")
     p.add_argument("--debug", action="store_true")
     return p.parse_args(argv)
 
 
 async def amain(args) -> None:
-    s = load_settings()
+    s = load_settings(args.profile)
     if args.host:
         s.host = args.host
     if args.port:

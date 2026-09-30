@@ -108,9 +108,12 @@ class Assistant:
         from ..games.base import load_pack
         from ..voice.tts import Voice
 
+        from .usage import UsageMeter
+
+        self.usage = UsageMeter(self.s, self.bus)
         self.pack = load_pack(self.s.game_pack, self.bus, self.s, self.callout)
-        self.brain = Brain(self.s, self.pack)
-        self.voice = Voice(self.s, self.bus)
+        self.brain = Brain(self.s, self.pack, self.usage)
+        self.voice = Voice(self.s, self.bus, self.usage)
         await self.pack.start()
         tasks = [asyncio.create_task(self._speech_worker(), name="speech")]
 
@@ -122,10 +125,11 @@ class Assistant:
                 from ..voice.stt import Transcriber
 
                 self.mic = Microphone(self.s.mic_device or None, self.s.vad_threshold, self.s.vad_silence_ms)
-                self.stt = Transcriber(self.s)
+                self.stt = Transcriber(self.s, self.usage)
                 self.mic.start()
                 tasks.append(asyncio.create_task(self._listen_loop(), name="listen"))
 
+        log.info("Unidad %s · perfil %s · modelo %s", self.s.device_id, self.s.profile, self.s.chat_model)
         mode = "IA en línea" if self.s.has_openai else "modo sin conexión"
         await self.callout(f"{self.s.assistant_name} en línea. Sistemas de {self.pack.name} conectados, {mode}.", 1)
         try:

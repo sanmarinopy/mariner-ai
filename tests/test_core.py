@@ -80,3 +80,30 @@ def test_brain_tool_loop():
     second = fake.calls[1]["messages"]
     assert second[-1]["role"] == "tool" and '"combustible_pct": 50' in second[-1]["content"]
     assert len(b.history) == 2
+
+
+def test_profile_and_env_override(monkeypatch):
+    from mariner.config import load_settings
+
+    monkeypatch.setenv("OPENAI_TTS_VOICE", "onyx")
+    s = load_settings("default")
+    assert s.assistant_name == "Mariner" and s.history_turns == 6
+    assert s.tts_voice == "onyx"  # el entorno pisa al perfil
+    assert "gpt-6-luna" in s.pricing["chat"]
+
+
+def test_usage_meter_cost(tmp_path):
+    from mariner.config import load_settings
+    from mariner.core.usage import UsageMeter
+
+    s = load_settings("default")
+    s.data_dir = str(tmp_path)
+    m = UsageMeter(s)
+    u = NS(prompt_tokens=1000, completion_tokens=100,
+           prompt_tokens_details=NS(cached_tokens=500), completion_tokens_details=NS(reasoning_tokens=20))
+    asyncio.run(m.chat("gpt-6-luna", u))
+    # 500*0.05 + 500*0.005 + 100*0.25 = 52.5 por 1M
+    assert abs(m.total.cost - 52.5e-6) < 1e-12 and not m.total.cost_unknown
+    asyncio.run(m.chat("modelo-sin-precio", u))
+    assert m.total.cost_unknown
+    assert len(list(tmp_path.glob("usage-*.jsonl"))) == 1

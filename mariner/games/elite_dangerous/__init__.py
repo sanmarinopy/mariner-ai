@@ -11,18 +11,13 @@ from .state import ShipState
 
 SCOOPABLE = set("KGBFOAM")  # clases estelares de las que se puede recoger combustible
 
-PERSONA = """Eres {name}, la inteligencia de a bordo de la nave del comandante en Elite Dangerous.
-Hablas en español rioplatense neutro, con estilo de IA de cabina: breve, precisa, serena,
-con un toque de calidez y humor seco ocasional. Te diriges al jugador como "comandante".
-
-Reglas:
-- Respuestas cortas (1 a 3 frases). Se escuchan en voz alta durante el vuelo.
-- Usa el ESTADO DE LA NAVE que se adjunta; si falta un dato, dilo sin inventar.
-- Para datos del juego (sistemas, módulos, ingeniería, mecánicas) responde con lo que sabes de
-  Elite Dangerous y aclara cuando algo puede haber cambiado con actualizaciones.
-- Nada de listas ni markdown: todo se convierte en voz.
-- Si el comandante pide una acción física en la nave (tren de aterrizaje, salto, etc.)
-  explica que aún no tienes control de mandos en esta versión.
+# Reglas propias del juego. La personalidad viene del perfil (profiles/*.toml).
+PERSONA = """Contexto: el comandante juega Elite Dangerous y tú eres la IA de su nave.
+- Usa el ESTADO DE LA NAVE adjunto; si falta un dato, dilo sin inventar.
+- Para mecánicas, módulos, ingeniería o sistemas responde con lo que sabes de Elite Dangerous
+  y aclara si algo puede haber cambiado con actualizaciones.
+- Si pide una acción física en la nave (tren de aterrizaje, salto, etc.) explica que aún
+  no tienes control de mandos en esta versión.
 """
 
 
@@ -78,6 +73,9 @@ class Pack(GamePack):
 
     # ------------------------------------------------------------------ avisos proactivos
     async def _say(self, key: str, text: str, prio: int = 1, cooldown: float = 8.0) -> None:
+        cfg = self.settings
+        if not cfg.callouts_enabled or key.rstrip("0123456789") in cfg.callouts_muted:
+            return
         now = time.monotonic()
         if now - self._last_callout.get(key, -1e9) < cooldown:
             return
@@ -142,7 +140,7 @@ class Pack(GamePack):
 
     # ------------------------------------------------------------------ IA
     def persona(self) -> str:
-        return PERSONA.format(name=self.settings.assistant_name)
+        return PERSONA
 
     def context(self) -> str:
         return "ESTADO DE LA NAVE (tiempo real): " + json.dumps(self.state.summary(), ensure_ascii=False)

@@ -17,7 +17,7 @@ from ..core.events import EventBus
 
 log = logging.getLogger("mariner.ui")
 WEB = Path(__file__).parent / "web"
-FORWARD = ("assistant.state", "assistant.say", "audio.level", "user.said", "game.hud")
+FORWARD = ("assistant.state", "assistant.say", "audio.level", "user.said", "game.hud", "usage")
 
 
 class UIServer:

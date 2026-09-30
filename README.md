@@ -28,10 +28,19 @@ Escribe preguntas en el cuadro inferior izquierdo: *"¿cuánto combustible nos q
 | `python -m mariner.tools.mic_test` | Lista micrófonos y mide el nivel para calibrar `VAD_THRESHOLD`. |
 | `python -m mariner.tools.enroll --name cristian` | Registra tu voz para que te reconozca (`SPEAKER_ID=true`). |
 | `python -m mariner.bridge --target ws://IP_PI:8765/bridge` | En la PC gamer: envía la telemetría a la Raspberry. |
+| `python -m mariner.tools.bench --tts` | Mide tokens, latencia y costo con preguntas típicas (usa tu API key). |
+| `python -m mariner.tools.usage_report` | Resumen del consumo real registrado en `data/`. |
 | `python -m pytest` | Tests (instalar `pytest` antes). |
 
 En la interfaz: **H** alterna el modo holograma (sin consola ni cursor), **F** pantalla completa, **M** espejo.
 URL directa del modo proyector: `http://localhost:8765/?holo=1`.
+
+## Conducta y consumo
+- **Perfil** `profiles/<nombre>.toml`: personalidad, largo de respuestas, memoria, voz, avisos y modelos.
+  Cada unidad elige el suyo con `PROFILE=` en `.env`.
+- **`.env`**: sólo datos de la unidad (`DEVICE_ID`, `OPENAI_API_KEY`, micrófono).
+- **Consumo**: cada llamada queda en `data/usage-AAAA-MM.jsonl` y se ve en vivo en la consola de la interfaz.
+  Los precios para estimar costos están en `profiles/pricing.toml` (verificarlos).
 
 ## Estructura
 

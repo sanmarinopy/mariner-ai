@@ -1,0 +1,19 @@
+# Precios en USD para ESTIMAR costos. Los tokens se miden reales; el costo depende de esta tabla.
+# VERIFICAR en https://developers.openai.com/api/docs/pricing  (valores tomados el 2026-09-29;
+# algunas páginas de OpenAI muestran cifras distintas entre sí).
+# 0 = precio desconocido: el reporte mostrará tokens pero costo "?".
+
+[chat]  # USD por 1M de tokens
+"gpt-5.4-mini" = { input = 0, cached = 0, output = 0 }   # completar
+"gpt-5.4-nano" = { input = 0, cached = 0, output = 0 }   # completar
+"gpt-6-luna"   = { input = 0.05, cached = 0.005, output = 0.25 }
+"gpt-6.1-sol"  = { input = 1.00, cached = 0.05,  output = 5.00 }
+
+[stt]  # USD por minuto de audio
+"gpt-4o-mini-transcribe" = 0.003
+"gpt-4o-transcribe" = 0.006
+"gpt-transcribe" = 0.0045
+"gpt-4o-transcribe-diarize" = 0.006   # verificar
+
+[tts]  # USD por minuto de audio generado (estimado; OpenAI cobra $12 / 1M tokens de audio de salida)
+"gpt-4o-mini-tts" = 0.015

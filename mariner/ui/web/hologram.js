@@ -285,6 +285,15 @@ function connect() {
         S.caption = data.text; S.captionKind = data.kind; S.captionAt = performance.now();
         logLine(data.text, data.kind === "callout" ? "callout" : "");
         break;
+      case "usage": {
+        const u = data;
+        const cost = u.cost_unknown ? (u.cost ? `≥ US$ ${u.cost.toFixed(4)} (faltan precios)` : "costo: completar pricing.toml")
+                                    : `US$ ${u.cost.toFixed(4)}`;
+        document.getElementById("usage").textContent =
+          `Consumo sesión: ${u.input_tokens} tok entrada (${u.cached_tokens} caché) · ${u.output_tokens} tok salida · ` +
+          `voz ${u.tts_minutes.toFixed(2)} min (+${u.tts_cached} de caché) · oído ${u.stt_minutes.toFixed(2)} min · ${cost}`;
+        break;
+      }
       case "user.said":
         S.heard = data.text; S.heardAt = performance.now();
         logLine((data.speaker ? `[${data.speaker}] ` : "Tú: ") + data.text, "you");

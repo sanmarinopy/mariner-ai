@@ -19,7 +19,8 @@ log = logging.getLogger("mariner.stt")
 
 
 class Transcriber:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, usage=None) -> None:
+        self.usage = usage
         from openai import AsyncOpenAI
 
         self.s = settings
@@ -45,6 +46,10 @@ class Transcriber:
     async def transcribe(self, wav: bytes) -> tuple[str, str | None]:
         """Devuelve (texto, hablante|None)."""
         file = ("frase.wav", wav, "audio/wav")
+        seconds = max(0, len(wav) - 44) / 32000  # WAV 16 kHz, 16 bit, mono
+        model = self.s.speaker_model if self.refs else self.s.stt_model
+        if self.usage:
+            await self.usage.stt(model, seconds)
         if self.refs:
             r = await self.client.audio.transcriptions.create(
                 file=file, model=self.s.speaker_model, response_format="diarized_json",

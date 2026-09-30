@@ -10,3 +10,4 @@ voices/*
 *.log
 .vscode/
 .idea/
+data/
