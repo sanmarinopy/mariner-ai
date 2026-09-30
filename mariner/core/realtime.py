@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from ..voice.effects import StreamFX
+from ..voice.speech_rules import voice_rules
 
 if TYPE_CHECKING:
     from .assistant import Assistant
@@ -55,11 +56,8 @@ class RealtimeEngine:
         return v
 
     def _voice_rules(self) -> str:
-        """Lo primero que lee el modelo: idioma y acento (los modelos de voz priorizan el inicio)."""
-        accent = self.s.accent or "español latinoamericano neutro"
-        return (f"IDIOMA Y PRONUNCIACIÓN: habla siempre en {accent}, con pronunciación de hablante nativo. "
-                "Nada de acento extranjero ni entonación de alguien que aprende el idioma. "
-                f"Estilo de voz: {self.s.tts_style}")
+        """Lo primero que lee el modelo: idioma, acento y pronunciación."""
+        return voice_rules(self.s)
 
     def _instructions(self) -> str:
         return (self._voice_rules() + "\n\n" + self.a.brain.system_prompt()

@@ -27,6 +27,8 @@ realtime_reasoning = ""
 
 # Largo de las respuestas (cuanto más corto, menos tokens y menos audio).
 max_sentences = 2
+# Tope aproximado de palabras por respuesta (0 = sin tope). Si piden detalle, puede extenderse.
+max_words = 22
 # Tope de tokens de salida por respuesta (incluye el razonamiento interno en modelos que razonan).
 max_reply_tokens = 600
 # Esfuerzo de razonamiento: none | low | medium | high  (vacío = el valor del modelo).
@@ -43,12 +45,13 @@ history_turns = 6
 voice = "marin"
 # Acento (va primero en las instrucciones del modelo de voz). Ej.: "español rioplatense",
 # "español de México", "español latinoamericano neutro, como locutor de doblaje".
-accent = "español argentino, con la dicción clara de un locutor de doblaje latino"
+accent = "español latino neutro, con la dicción clara de un locutor de doblaje latino"
 # Cómo habla: tono, ritmo, emoción. Es texto libre.
 style = """Habla con naturalidad y fluidez, como una copiloto humana que conoce bien la nave.
 Ritmo conversacional, entonación expresiva y cálida, sin pausas robóticas entre frases.
 Serena y segura; un poco más enérgica en las alertas."""
-# Efecto local sobre la voz (sin costo): none | nave | androide | robot
+# Efecto local sobre la voz (sin costo): none | cabina | nave | androide | robot
+# "cabina" es el más limpio: resonancia leve sin modulación (no ensucia la r).
 effect = "androide"
 # Intensidad del efecto, de 0 a 1
 effect_mix = 0.3

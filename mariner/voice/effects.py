@@ -2,6 +2,7 @@
 
 Presets:
   none      voz tal cual
+  cabina    sonido de altavoz de cabina, muy leve y limpio (no altera la pronunciación)
   nave      intercomunicador de cabina: eco metálico corto y banda de radio amplia
   androide  IA de nave: modulación sutil + resonancia metálica
   robot     computadora clásica: modulación fuerte, eco corto y algo de "bits"
@@ -24,6 +25,7 @@ except Exception:  # pragma: no cover
 
 PRESETS: dict[str, list[tuple]] = {
     "none": [],
+    "cabina": [("comb", 9, 0.18), ("band", 110, 8500)],
     "nave": [("comb", 7, 0.30), ("band", 140, 7000)],
     "androide": [("ring", 38, 0.30), ("comb", 4.5, 0.40), ("band", 200, 6000)],
     "robot": [("ring", 85, 0.65), ("comb", 3, 0.50), ("crush", 10, 2), ("band", 220, 4500)],

@@ -12,6 +12,7 @@ import numpy as np
 from ..config import Settings
 from ..core.events import EventBus
 from . import effects
+from .speech_rules import voice_rules
 
 log = logging.getLogger("mariner.tts")
 TTS_RATE = 24000  # response_format="pcm" -> 24 kHz, 16 bit, mono
@@ -43,8 +44,7 @@ class Voice:
         return self.cache_dir / (hashlib.sha1(key.encode("utf-8")).hexdigest() + ".pcm")
 
     def _instructions(self) -> str:
-        accent = f"Habla en {self.s.accent}, con pronunciación nativa. " if self.s.accent else ""
-        return accent + self.s.tts_style
+        return voice_rules(self.s)
 
     async def synthesize(self, text: str) -> tuple[bytes, bool]:
         """Devuelve (pcm 24 kHz s16le, vino_de_caché). Registra el consumo."""

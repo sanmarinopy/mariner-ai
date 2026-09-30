@@ -4,6 +4,7 @@
   python -m mariner.tools.rt_voices --only cedar,coral --effect none
   python -m mariner.tools.rt_voices --only marin --models gpt-realtime-2.1-mini,gpt-realtime-2.1
   python -m mariner.tools.rt_voices --accent "español rioplatense"
+  python -m mariner.tools.rt_voices --only marin --effects none,cabina,androide   # misma muestra, 3 efectos
 
 Cada prueba abre una conexión corta y lee la misma frase. Cuesta unos centavos en total.
 """
@@ -17,10 +18,11 @@ import numpy as np
 
 from ..config import load_settings
 from ..voice.effects import StreamFX
+from ..voice.speech_rules import voice_rules
 
 VOICES = ["marin", "cedar", "coral", "sage", "shimmer", "ballad", "verse", "alloy", "ash", "echo"]
-PHRASE = ("Comandante, salto completado. Estamos en Wolf 359 con el sesenta y tres por ciento de "
-          "combustible. El casco resistió bien. ¿Seguimos la ruta hacia Sirius?")
+PHRASE = ("Comandante, salto completado. Estamos en Wolf 359, cerca de la reserva de combustible. "
+          "El radar marca tres naves; el casco resistió bien. ¿Seguimos la ruta hacia Sirius?")
 
 
 async def sample(client, model: str, voice: str, instructions: str, text: str) -> np.ndarray:
@@ -52,9 +54,10 @@ async def amain(a) -> None:
     s = load_settings(a.profile)
     if not s.has_openai:
         raise SystemExit("Falta OPENAI_API_KEY en .env")
-    accent = a.accent or s.accent or "español latinoamericano neutro"
-    instructions = (f"IDIOMA Y PRONUNCIACIÓN: habla siempre en {accent}, con pronunciación de hablante nativo. "
-                    f"Nada de acento extranjero. Estilo de voz: {s.tts_style}")
+    if a.accent:
+        s.accent = a.accent
+    accent = s.accent
+    instructions = voice_rules(s)
     effect = a.effect if a.effect is not None else s.tts_effect
     client = AsyncOpenAI(api_key=s.openai_api_key)
     models = [m.strip() for m in (a.models or s.realtime_model).split(",")]
@@ -68,9 +71,13 @@ async def amain(a) -> None:
             except Exception as e:
                 print(f"   error: {e}")
                 continue
-            sd.play(StreamFX(effect, s.tts_effect_mix).process(pcm), 24000)
-            sd.wait()
-            await asyncio.sleep(0.6)
+            for fx in (a.effects.split(",") if a.effects else [effect]):
+                fx = fx.strip()
+                if a.effects:
+                    print(f"   efecto: {fx}", flush=True)
+                sd.play(StreamFX(fx, s.tts_effect_mix if fx != "none" else 1.0).process(pcm), 24000)
+                sd.wait()
+                await asyncio.sleep(0.6)
     print('\nElegí y ponlo en profiles/default.toml → voice = "...", models.realtime = "...", accent = "..."')
 
 
@@ -80,7 +87,8 @@ def main() -> None:
     p.add_argument("--only", help="Voces separadas por comas")
     p.add_argument("--models", help="Modelos de tiempo real separados por comas")
     p.add_argument("--accent")
-    p.add_argument("--effect", help="none | nave | androide | robot (por defecto el del perfil)")
+    p.add_argument("--effect", help="none | cabina | nave | androide | robot (por defecto el del perfil)")
+    p.add_argument("--effects", help="Varios efectos sobre la MISMA muestra (sin costo extra), ej. none,cabina,androide")
     p.add_argument("--text", default=PHRASE)
     asyncio.run(amain(p.parse_args()))
 

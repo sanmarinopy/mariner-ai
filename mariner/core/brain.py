@@ -36,8 +36,9 @@ class Brain:
 
     def system_prompt(self, speaker: str | None = None) -> str:
         s = self.settings
-        rules = (f"Responde en idioma '{s.language}', en {s.max_sentences} frases como máximo. "
-                 "Nada de listas ni markdown: todo se convierte en voz.")
+        words = f" y unas {s.max_words} palabras en total" if s.max_words else ""
+        rules = (f"Responde en idioma '{s.language}', en {s.max_sentences} frases cortas como máximo{words}; "
+                 "más largo sólo si te piden detalle. Nada de listas ni markdown: todo se convierte en voz.")
         # Orden pensado para el caché de OpenAI: lo fijo primero, lo que cambia (estado) al final.
         if self.pack.telemetry_active():
             parts = [s.personality.format(name=s.assistant_name).strip(), self.pack.persona(), rules,

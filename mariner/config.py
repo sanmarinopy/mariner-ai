@@ -48,6 +48,7 @@ class Settings:
     require_wake_word: bool = False
     personality: str = ""
     max_sentences: int = 3
+    max_words: int = 0
     max_reply_tokens: int = 600
     reasoning_effort: str = "low"
     history_turns: int = 6
@@ -107,6 +108,7 @@ _PROFILE_MAP = {
     "require_wake_word": ("assistant", "require_wake_word"),
     "personality": ("assistant", "personality"),
     "max_sentences": ("assistant", "max_sentences"),
+    "max_words": ("assistant", "max_words"),
     "max_reply_tokens": ("assistant", "max_reply_tokens"),
     "reasoning_effort": ("assistant", "reasoning_effort"),
     "history_turns": ("assistant", "history_turns"),
