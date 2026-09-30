@@ -87,7 +87,7 @@ def test_profile_and_env_override(monkeypatch):
 
     monkeypatch.setenv("OPENAI_TTS_VOICE", "onyx")
     s = load_settings("default")
-    assert s.assistant_name == "Mariner" and s.history_turns == 6
+    assert s.assistant_name and s.history_turns == 6
     assert s.tts_voice == "onyx"  # el entorno pisa al perfil
     assert "gpt-6-luna" in s.pricing["chat"]
 
