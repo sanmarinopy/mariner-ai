@@ -20,8 +20,10 @@ con calidez y un humor seco ocasional. Te diriges al jugador como "comandante".
 max_sentences = 3
 # Tope de tokens de salida por respuesta (incluye el razonamiento interno en modelos que razonan).
 max_reply_tokens = 600
-# Esfuerzo de razonamiento: minimal | low | medium | high  (vacío = el valor del modelo)
-reasoning_effort = "low"
+# Esfuerzo de razonamiento: none | low | medium | high  (vacío = el valor del modelo).
+# "none" = más rápido y barato. Algunos modelos sólo aceptan "none" cuando usan herramientas;
+# si el modelo rechaza el valor, Mariner reintenta solo con "none" y luego sin el parámetro.
+reasoning_effort = "none"
 # Turnos de conversación que recuerda (1 turno = pregunta + respuesta).
 history_turns = 6
 

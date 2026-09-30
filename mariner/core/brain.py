@@ -19,6 +19,7 @@ class Brain:
         self.usage = usage
         self.history: list[dict[str, Any]] = []
         self.client = None
+        self._effort = settings.reasoning_effort or None  # se ajusta si el modelo lo rechaza
         if settings.has_openai:
             from openai import AsyncOpenAI
 
@@ -35,6 +36,25 @@ class Brain:
             parts.append(f"Quien te habla ahora fue identificado por voz como: {speaker}.")
         return "\n\n".join(p for p in parts if p)
 
+    async def _create(self, kwargs: dict[str, Any]):
+        """Llama al modelo; si rechaza reasoning_effort, prueba "none" y después sin el parámetro."""
+        from openai import BadRequestError
+
+        while True:
+            if self._effort:
+                kwargs["reasoning_effort"] = self._effort
+            else:
+                kwargs.pop("reasoning_effort", None)
+            try:
+                return await self.client.chat.completions.create(**kwargs)
+            except BadRequestError as e:
+                if "reasoning_effort" not in str(e) or not self._effort:
+                    raise
+                nuevo = "none" if self._effort != "none" else None
+                log.warning("El modelo %s no acepta reasoning_effort=%s; uso %s",
+                            kwargs["model"], self._effort, nuevo or "(sin parámetro)")
+                self._effort = nuevo
+
     async def ask(self, text: str, speaker: str | None = None) -> str:
         if not self.client:
             return self.pack.offline_reply(text)
@@ -50,11 +70,9 @@ class Brain:
         for _ in range(MAX_TOOL_ROUNDS):
             kwargs: dict[str, Any] = {"model": s.chat_model, "messages": messages,
                                       "max_completion_tokens": s.max_reply_tokens}
-            if s.reasoning_effort:
-                kwargs["reasoning_effort"] = s.reasoning_effort
             if tools:
                 kwargs["tools"] = tools
-            resp = await self.client.chat.completions.create(**kwargs)
+            resp = await self._create(kwargs)
             if self.usage:
                 await self.usage.chat(s.chat_model, getattr(resp, "usage", None))
             msg = resp.choices[0].message

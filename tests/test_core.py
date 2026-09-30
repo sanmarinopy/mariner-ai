@@ -107,3 +107,28 @@ def test_usage_meter_cost(tmp_path):
     asyncio.run(m.chat("modelo-sin-precio", u))
     assert m.total.cost_unknown
     assert len(list(tmp_path.glob("usage-*.jsonl"))) == 1
+
+
+def test_reasoning_effort_fallback():
+    import httpx
+    from openai import BadRequestError
+
+    calls = []
+
+    class Picky:
+        async def create(self, **kw):
+            calls.append(kw.get("reasoning_effort"))
+            if kw.get("reasoning_effort") != "none":
+                req = httpx.Request("POST", "https://x")
+                raise BadRequestError("reasoning_effort not supported", response=httpx.Response(400, request=req), body=None)
+            return NS(usage=None, choices=[NS(message=NS(content="ok", tool_calls=None))])
+
+    async def noop(*a):
+        pass
+
+    s = Settings(openai_api_key="", reasoning_effort="low")
+    b = Brain(s, Pack(EventBus(), s, noop))
+    b.client = NS(chat=NS(completions=Picky()))
+    assert asyncio.run(b.ask("hola")) == "ok"
+    assert asyncio.run(b.ask("hola")) == "ok"
+    assert calls == ["low", "none", "none"]
