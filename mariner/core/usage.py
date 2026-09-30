@@ -73,6 +73,27 @@ class UsageMeter:
         await self._record("chat", model, cost, input_tokens=inp, cached_tokens=cached,
                            output_tokens=out, reasoning_tokens=reasoning)
 
+    async def realtime(self, model: str, usage: Any) -> None:
+        """Consumo de una respuesta en tiempo real (tokens de texto y de audio, entrada y salida)."""
+        g = lambda o, k: (getattr(o, k, 0) or 0) if o is not None else 0  # noqa: E731
+        ind, outd = getattr(usage, "input_token_details", None), getattr(usage, "output_token_details", None)
+        cached_d = getattr(ind, "cached_tokens_details", None)
+        a_in, t_in = g(ind, "audio_tokens"), g(ind, "text_tokens")
+        a_c, t_c = g(cached_d, "audio_tokens"), g(cached_d, "text_tokens")
+        a_out, t_out = g(outd, "audio_tokens"), g(outd, "text_tokens")
+        p = self.s.pricing.get("realtime", {}).get(model)
+        cost = None
+        if p:
+            cost = ((a_in - a_c) * p["audio_in"] + a_c * p["audio_cached"] + a_out * p["audio_out"]
+                    + (t_in - t_c) * p["text_in"] + t_c * p["text_cached"] + t_out * p["text_out"]) / 1e6
+        t = self.total
+        t.input_tokens += a_in + t_in
+        t.cached_tokens += a_c + t_c
+        t.output_tokens += a_out + t_out
+        await self._record("realtime", model, cost, audio_in=a_in, text_in=t_in, cached_audio=a_c,
+                           cached_text=t_c, audio_out=a_out, text_out=t_out,
+                           input_tokens=a_in + t_in, cached_tokens=a_c + t_c, output_tokens=a_out + t_out)
+
     async def stt(self, model: str, seconds: float) -> None:
         m = seconds / 60
         self.total.stt_minutes += m

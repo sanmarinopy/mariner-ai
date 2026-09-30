@@ -197,3 +197,95 @@ def test_brain_streaming_emits_sentences():
     out = asyncio.run(b.ask("¿estado?", emit=emit))
     assert got == ["Salto completado, comandante.", "Combustible al cincuenta por ciento.", "Todo en orden."]
     assert out.startswith("Salto completado") and b.history[-1]["content"] == out
+
+
+def test_streamfx_chunked_equals_whole():
+    import numpy as np
+    from mariner.voice.effects import StreamFX
+
+    rng = np.random.default_rng(0)
+    x = (rng.standard_normal(24000) * 0.2).astype(np.float32)
+    for preset in ("nave", "androide", "robot"):
+        whole = StreamFX(preset, 0.7).process(x)
+        fx = StreamFX(preset, 0.7)
+        parts = [fx.process(x[i:i + 1234]) for i in range(0, len(x), 1234)]
+        assert np.allclose(np.concatenate(parts), whole, atol=1e-5), preset
+
+
+def test_realtime_engine_event_flow():
+    import base64
+    import numpy as np
+    from mariner.core.assistant import Assistant
+    from mariner.core.realtime import RealtimeEngine
+    from mariner.core.usage import UsageMeter
+
+    class FakeConn:
+        def __init__(self, events):
+            self.events, self.sent = events, []
+            self.response = NS(create=self._rec("response.create"))
+            self.conversation = NS(item=NS(create=self._rec("item.create")))
+
+        def _rec(self, name):
+            async def f(**kw):
+                self.sent.append((name, kw))
+            return f
+
+        def __aiter__(self):
+            async def gen():
+                for e in self.events:
+                    yield e
+            return gen()
+
+    class FakePlayer:
+        def __init__(self):
+            self.pushed, self.level = [], 0.0
+
+        def push(self, pcm):
+            self.pushed.append(pcm)
+
+        busy = False
+
+    audio = base64.b64encode((np.ones(480) * 1000).astype("<i2").tobytes()).decode()
+    usage = NS(input_token_details=NS(audio_tokens=100, text_tokens=900, cached_tokens_details=NS(audio_tokens=0, text_tokens=800)),
+               output_token_details=NS(audio_tokens=200, text_tokens=30))
+    events = [
+        NS(type="input_audio_buffer.speech_started"),
+        NS(type="input_audio_buffer.speech_stopped"),
+        NS(type="input_audio_buffer.committed"),
+        NS(type="conversation.item.input_audio_transcription.completed", transcript="¿Qué pasó?"),
+        NS(type="response.function_call_arguments.done", name="get_recent_events", arguments='{"count": 1}', call_id="c1"),
+        NS(type="response.done", response=NS(usage=usage)),
+        NS(type="response.output_audio.delta", delta=audio),
+        NS(type="response.output_audio_transcript.done", transcript="Nada grave, comandante."),
+        NS(type="response.done", response=NS(usage=usage)),
+    ]
+
+    async def run():
+        s = Settings(openai_api_key="", tts_effect="androide")
+        s.pricing = {"realtime": {"m": dict(audio_in=10, audio_cached=0.3, audio_out=20, text_in=0.6, text_cached=0.06, text_out=2.4)}}
+        s.realtime_model = "m"
+        bus = EventBus()
+        said = []
+
+        async def on(topic, data):
+            said.append((topic, data))
+        bus.subscribe("assistant.say", on)
+        bus.subscribe("user.said", on)
+        a = Assistant(s, bus)
+        a.pack = Pack(bus, s, a.callout)
+        a.brain = Brain(s, a.pack)
+        a.usage = UsageMeter(s, write=False)
+        e = RealtimeEngine(a)
+        e.conn, e.player, e.mic = FakeConn(events), FakePlayer(), NS(muted=False)
+        await e._events()
+        await asyncio.sleep(0.4)
+        return e, a, said
+
+    e, a, said = asyncio.run(run())
+    kinds = [k for k, _ in e.conn.sent]
+    assert kinds == ["response.create", "item.create", "response.create"]
+    assert "ESTADO DE LA NAVE" in e.conn.sent[0][1]["response"]["instructions"]
+    assert len(e.player.pushed) == 1 and e.mic.muted is False
+    assert ("user.said", {"text": "¿Qué pasó?", "speaker": None}) in said
+    assert any(d["text"] == "Nada grave, comandante." for k, d in said if k == "assistant.say")
+    assert a.usage.total.output_tokens == 460 and a.usage.total.cost > 0

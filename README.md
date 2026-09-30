@@ -36,6 +36,12 @@ Escribe preguntas en el cuadro inferior izquierdo: *"¿cuánto combustible nos q
 En la interfaz: **H** alterna el modo holograma (sin consola ni cursor), **F** pantalla completa, **M** espejo.
 URL directa del modo proyector: `http://localhost:8765/?holo=1`.
 
+## Motores de voz
+- **`realtime`** (por defecto): voz a voz con la Realtime API de OpenAI en una sola conexión. Empieza a
+  responder en ~1 s. Voces disponibles: marin, cedar, coral, sage, shimmer, ballad, verse, alloy, ash, echo.
+- **`pipeline`**: micrófono → transcripción → IA → voz. Más barato y permite reconocer quién habla,
+  pero tarda 3–5 s. Se elige con `engine =` en el perfil.
+
 ## Conducta y consumo
 - **Perfil** `profiles/<nombre>.toml`: personalidad, largo de respuestas, memoria, voz, avisos y modelos.
   Cada unidad elige el suyo con `PROFILE=` en `.env`.

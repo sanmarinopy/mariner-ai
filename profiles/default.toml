@@ -18,6 +18,13 @@ No hagas chistes, ironías ni comparaciones graciosas. Sólo si el comandante br
 puedes responder con una broma breve. Te diriges al jugador como "comandante".
 """
 
+# Motor de voz:
+#   realtime = voz a voz en una sola conexión (la respuesta empieza en ~1 s). Recomendado para jugar.
+#   pipeline = voz→texto→IA→voz (más barato, ~3-5 s). Necesario para reconocer quién habla.
+engine = "realtime"
+# Razonamiento del modelo de tiempo real (vacío = por defecto; minimal = más rápido)
+realtime_reasoning = ""
+
 # Largo de las respuestas (cuanto más corto, menos tokens y menos audio).
 max_sentences = 2
 # Tope de tokens de salida por respuesta (incluye el razonamiento interno en modelos que razonan).
@@ -32,6 +39,7 @@ history_turns = 6
 [voice]
 # Voces: marin, cedar (las más naturales), coral, nova, sage, shimmer, ballad, verse,
 # alloy, ash, echo, fable, onyx.  Probarlas: python -m mariner.tools.voices
+# En tiempo real sólo existen: marin, cedar, coral, sage, shimmer, ballad, verse, alloy, ash, echo.
 voice = "marin"
 # Cómo habla: tono, ritmo, emoción, acento. Es texto libre.
 style = """Habla con naturalidad y fluidez, como una copiloto humana que conoce bien la nave.
@@ -56,3 +64,5 @@ chat = "gpt-5.4-mini"
 stt = "gpt-4o-mini-transcribe"
 tts = "gpt-4o-mini-tts"
 speaker = "gpt-4o-transcribe-diarize"
+# Modelo de voz a voz (engine = "realtime")
+realtime = "gpt-realtime-2.1-mini"

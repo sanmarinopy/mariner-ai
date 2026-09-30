@@ -17,3 +17,7 @@
 
 [tts]  # USD por minuto de audio generado (estimado; OpenAI cobra $12 / 1M tokens de audio de salida)
 "gpt-4o-mini-tts" = 0.015
+
+[realtime]  # USD por 1M de tokens (audio y texto). Audio: VERIFICAR. Texto: estimado, VERIFICAR.
+"gpt-realtime-2.1-mini" = { audio_in = 10.0, audio_cached = 0.30, audio_out = 20.0, text_in = 0.60, text_cached = 0.06, text_out = 2.40 }
+"gpt-realtime-2.1"      = { audio_in = 32.0, audio_cached = 0.40, audio_out = 64.0, text_in = 4.00, text_cached = 0.40, text_out = 16.00 }

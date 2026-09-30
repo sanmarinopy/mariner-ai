@@ -51,6 +51,9 @@ class Settings:
     max_reply_tokens: int = 600
     reasoning_effort: str = "low"
     history_turns: int = 6
+    engine: str = "pipeline"  # pipeline (voz→texto→IA→voz) | realtime (voz a voz, menor demora)
+    realtime_model: str = "gpt-realtime-2.1-mini"
+    realtime_reasoning: str = ""
     callouts_enabled: bool = True
     callouts_muted: list[str] = field(default_factory=list)
 
@@ -106,6 +109,9 @@ _PROFILE_MAP = {
     "max_reply_tokens": ("assistant", "max_reply_tokens"),
     "reasoning_effort": ("assistant", "reasoning_effort"),
     "history_turns": ("assistant", "history_turns"),
+    "engine": ("assistant", "engine"),
+    "realtime_model": ("models", "realtime"),
+    "realtime_reasoning": ("assistant", "realtime_reasoning"),
     "tts_voice": ("voice", "voice"),
     "tts_style": ("voice", "style"),
     "tts_cache": ("voice", "cache"),
@@ -121,7 +127,7 @@ _PROFILE_MAP = {
 
 # campo -> variable de entorno
 _ENV_MAP = {
-    "device_id": "DEVICE_ID", "profile": "PROFILE",
+    "device_id": "DEVICE_ID", "profile": "PROFILE", "engine": "ENGINE",
     "assistant_name": "ASSISTANT_NAME", "language": "LANGUAGE", "require_wake_word": "REQUIRE_WAKE_WORD",
     "game_pack": "GAME_PACK", "game_source": "GAME_SOURCE", "elite_journal_dir": "ELITE_JOURNAL_DIR",
     "openai_api_key": "OPENAI_API_KEY", "chat_model": "OPENAI_CHAT_MODEL", "stt_model": "OPENAI_STT_MODEL",

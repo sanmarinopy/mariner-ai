@@ -31,6 +31,8 @@ class Assistant:
         self.voice = None
         self.mic = None
         self.stt = None
+        self.engine = None  # motor de tiempo real (si está activo)
+        self.usage = None
         # cola de habla con prioridad: (−prioridad, orden, texto, tipo, creado)
         self._speech: asyncio.PriorityQueue = asyncio.PriorityQueue()
         # audio ya generado esperando su turno (se genera la frase siguiente mientras suena la actual)
@@ -63,6 +65,9 @@ class Assistant:
             log.info("Ignorado: hablante no registrado (%s)", speaker)
             self._t_heard = None
             await self.set_state("idle")
+            return
+        if self.engine:  # tiempo real: el mismo canal de voz responde al texto escrito
+            await self.engine.send_text(text)
             return
         async with self._busy:
             await self.set_state("thinking")
@@ -107,7 +112,10 @@ class Assistant:
             if self.mic:
                 self.mic.muted = True
             try:
-                await self.voice.play(pcm, text)
+                if self.engine:
+                    await self.engine.play(pcm, text)
+                else:
+                    await self.voice.play(pcm, text)
             finally:
                 if self.mic and self._ready.empty() and self._speech.empty() and not self._busy.locked():
                     await asyncio.sleep(0.2)  # cola de eco de los parlantes
@@ -153,7 +161,12 @@ class Assistant:
 
         if voice_input:
             if not self.s.has_openai:
-                log.warning("--voice requiere OPENAI_API_KEY (la transcripción es en la nube). Sigo sin micrófono.")
+                log.warning("--voice requiere OPENAI_API_KEY. Sigo sin micrófono.")
+            elif self.s.engine == "realtime":
+                from .realtime import RealtimeEngine
+
+                self.engine = RealtimeEngine(self)
+                tasks.append(asyncio.create_task(self.engine.run(), name="realtime"))
             else:
                 from ..voice.mic import Microphone
                 from ..voice.stt import Transcriber
@@ -163,8 +176,9 @@ class Assistant:
                 self.mic.start()
                 tasks.append(asyncio.create_task(self._listen_loop(), name="listen"))
 
-        log.info("Unidad %s · perfil %s · modelo %s · voz %s · efecto %s", self.s.device_id, self.s.profile,
-                 self.s.chat_model, self.s.tts_voice, self.s.tts_effect)
+        log.info("Unidad %s · perfil %s · motor %s · modelo %s · voz %s · efecto %s", self.s.device_id,
+                 self.s.profile, "tiempo real" if self.engine else "clásico",
+                 self.s.realtime_model if self.engine else self.s.chat_model, self.s.tts_voice, self.s.tts_effect)
         if self.s.env_overrides:
             log.warning("El .env pisa al perfil en: %s  (vacíalos en .env para usar el perfil)",
                         ", ".join(self.s.env_overrides))
