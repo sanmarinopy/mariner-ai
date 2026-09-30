@@ -41,6 +41,9 @@ class RealtimeEngine:
         self._pending_tool = False
         self._transcript = ""
         self._ready = asyncio.Event()
+        self._replying = False  # hay una respuesta a una pregunta en curso
+        self._callout_ids: set[str] = set()
+        self._callout_done: asyncio.Event | None = None
 
     # ------------------------------------------------------------------ configuración
     def _voice(self) -> str:
@@ -135,6 +138,7 @@ class RealtimeEngine:
             await asyncio.sleep(0.05)
 
     async def _respond(self) -> None:
+        self._replying = True
         self._first_audio = True
         self._transcript = ""
         # instrucciones frescas: el estado de la nave cambia todo el tiempo
@@ -150,6 +154,10 @@ class RealtimeEngine:
                 await self.a.set_state("thinking")
             elif t == "input_audio_buffer.committed":
                 await self._respond()
+            elif t == "response.created":
+                md = getattr(ev.response, "metadata", None) or {}
+                if md.get("kind") == "callout":
+                    self._callout_ids.add(ev.response.id)
             elif t == "conversation.item.input_audio_transcription.completed":
                 text = (ev.transcript or "").strip()
                 if text:
@@ -169,6 +177,8 @@ class RealtimeEngine:
                 self._transcript += ev.delta or ""
             elif t == "response.output_audio_transcript.done":
                 text = (ev.transcript or self._transcript).strip()
+                if getattr(ev, "response_id", None) in self._callout_ids:
+                    continue  # aviso: el texto ya se mostró al encolarlo
                 if text:
                     log.info("Responde: %s", text)
                     await self.a.bus.publish("assistant.say", {"text": text, "kind": "reply"})
@@ -186,10 +196,17 @@ class RealtimeEngine:
                 usage = getattr(ev.response, "usage", None)
                 if self.a.usage and usage:
                     await self.a.usage.realtime(self.s.realtime_model, usage)
+                rid = getattr(ev.response, "id", None)
+                if rid in self._callout_ids:
+                    self._callout_ids.discard(rid)
+                    if self._callout_done:
+                        self._callout_done.set()
+                    continue
                 if self._pending_tool:
                     self._pending_tool = False
                     await self._respond()
                 else:
+                    self._replying = False
                     asyncio.create_task(self._finish())
             elif t == "error":
                 err = getattr(ev, "error", None)
@@ -216,12 +233,27 @@ class RealtimeEngine:
         await self._respond()
 
     async def play(self, pcm: np.ndarray | None, text: str) -> None:
-        """Reproduce un aviso del juego por el mismo parlante, en orden con las respuestas."""
-        if pcm is None:
-            return
+        """Dice un aviso del juego con la MISMA voz del modo tiempo real.
+
+        Se pide como respuesta "fuera de la conversación": no entra en el historial y no se mezcla
+        con lo que estés hablando. Espera a que termine la respuesta en curso, si la hay."""
         await self._ready.wait()
         if self.conn is None or self.player is None:
             return
-        self.mic.muted = True
-        self.player.push(pcm)
+        while self._replying:
+            await asyncio.sleep(0.05)
+        self._callout_done = asyncio.Event()
+        self._first_audio = True
+        await self.conn.response.create(response={
+            "conversation": "none",
+            "input": [],
+            "metadata": {"kind": "callout"},
+            "instructions": ("Lee en voz alta exactamente este texto, palabra por palabra, sin agregar "
+                             f"ni quitar nada, con tono de aviso de cabina. Estilo de voz: {self.s.tts_style}\n"
+                             f"Texto: {text}"),
+        })
+        try:
+            await asyncio.wait_for(self._callout_done.wait(), timeout=20)
+        except asyncio.TimeoutError:
+            log.warning("El aviso no terminó a tiempo: %s", text)
         await self._finish()

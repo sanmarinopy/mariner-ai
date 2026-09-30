@@ -289,3 +289,33 @@ def test_realtime_engine_event_flow():
     assert ("user.said", {"text": "¿Qué pasó?", "speaker": None}) in said
     assert any(d["text"] == "Nada grave, comandante." for k, d in said if k == "assistant.say")
     assert a.usage.total.output_tokens == 460 and a.usage.total.cost > 0
+
+
+def test_realtime_callout_uses_same_voice():
+    from mariner.core.assistant import Assistant
+    from mariner.core.realtime import RealtimeEngine
+
+    async def run():
+        s = Settings(openai_api_key="")
+        a = Assistant(s, EventBus())
+        a.pack = Pack(a.bus, s, a.callout)
+        a.brain = Brain(s, a.pack)
+        e = RealtimeEngine(a)
+        sent = []
+
+        async def create(**kw):
+            sent.append(kw["response"])
+            # el servidor responde: creado → audio → terminado
+            asyncio.get_running_loop().call_later(0.05, lambda: e._callout_done.set())
+
+        e.conn = NS(response=NS(create=create))
+        e.player = NS(busy=False, push=lambda p: None, level=0.0)
+        e.mic = NS(muted=False)
+        e._ready.set()
+        await e.play(None, "Salto completado.")
+        return sent, e
+
+    sent, e = asyncio.run(run())
+    r = sent[0]
+    assert r["conversation"] == "none" and r["metadata"] == {"kind": "callout"}
+    assert "Salto completado." in r["instructions"] and e.mic.muted is False

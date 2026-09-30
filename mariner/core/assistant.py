@@ -95,7 +95,8 @@ class Assistant:
             _, _, text, kind, born = await self._speech.get()
             if kind == "callout" and time.monotonic() - born > STALE_CALLOUT_S:
                 continue  # aviso viejo: la situación ya cambió, no tiene sentido decirlo
-            pcm = await self.voice.prepare(text)
+            # en tiempo real los avisos los dice el mismo modelo (misma voz): no se genera audio aparte
+            pcm = None if self.engine else await self.voice.prepare(text)
             await self._ready.put((text, kind, pcm))
 
     async def _play_worker(self) -> None:
