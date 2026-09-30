@@ -70,6 +70,7 @@ class Settings:
     tts_voice: str = "nova"
     tts_style: str = ""
     tts_cache: bool = True
+    accent: str = ""
     tts_effect: str = "none"
     tts_effect_mix: float = 1.0
 
@@ -115,6 +116,7 @@ _PROFILE_MAP = {
     "tts_voice": ("voice", "voice"),
     "tts_style": ("voice", "style"),
     "tts_cache": ("voice", "cache"),
+    "accent": ("voice", "accent"),
     "tts_effect": ("voice", "effect"),
     "tts_effect_mix": ("voice", "effect_mix"),
     "callouts_enabled": ("callouts", "enabled"),

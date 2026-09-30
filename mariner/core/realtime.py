@@ -54,9 +54,15 @@ class RealtimeEngine:
             return "marin"
         return v
 
+    def _voice_rules(self) -> str:
+        """Lo primero que lee el modelo: idioma y acento (los modelos de voz priorizan el inicio)."""
+        accent = self.s.accent or "español latinoamericano neutro"
+        return (f"IDIOMA Y PRONUNCIACIÓN: habla siempre en {accent}, con pronunciación de hablante nativo. "
+                "Nada de acento extranjero ni entonación de alguien que aprende el idioma. "
+                f"Estilo de voz: {self.s.tts_style}")
+
     def _instructions(self) -> str:
-        return (self.a.brain.system_prompt()
-                + f"\n\nEstilo de voz: {self.s.tts_style}"
+        return (self._voice_rules() + "\n\n" + self.a.brain.system_prompt()
                 + "\nFrases cortas y claras. No ofrezcas ayuda adicional al final de cada respuesta.")
 
     def _tools(self) -> list[dict[str, Any]]:
@@ -248,8 +254,8 @@ class RealtimeEngine:
             "conversation": "none",
             "input": [],
             "metadata": {"kind": "callout"},
-            "instructions": ("Lee en voz alta exactamente este texto, palabra por palabra, sin agregar "
-                             f"ni quitar nada, con tono de aviso de cabina. Estilo de voz: {self.s.tts_style}\n"
+            "instructions": (self._voice_rules() + "\n\nLee en voz alta exactamente este texto, palabra "
+                             "por palabra, sin agregar ni quitar nada, con tono de aviso de cabina.\n"
                              f"Texto: {text}"),
         })
         try:

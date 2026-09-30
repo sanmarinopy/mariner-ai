@@ -39,8 +39,12 @@ class Voice:
             log.warning("Sin salida de audio disponible (%s). Se mostrará sólo texto.", e)
 
     def _cache_path(self, text: str) -> Path:
-        key = "|".join((self.s.tts_model, self.s.tts_voice, self.s.tts_style, text))
+        key = "|".join((self.s.tts_model, self.s.tts_voice, self._instructions(), text))
         return self.cache_dir / (hashlib.sha1(key.encode("utf-8")).hexdigest() + ".pcm")
+
+    def _instructions(self) -> str:
+        accent = f"Habla en {self.s.accent}, con pronunciación nativa. " if self.s.accent else ""
+        return accent + self.s.tts_style
 
     async def synthesize(self, text: str) -> tuple[bytes, bool]:
         """Devuelve (pcm 24 kHz s16le, vino_de_caché). Registra el consumo."""
@@ -50,7 +54,7 @@ class Voice:
         else:
             resp = await self.client.audio.speech.create(
                 model=self.s.tts_model, voice=self.s.tts_voice, input=text,
-                instructions=self.s.tts_style, response_format="pcm",
+                instructions=self._instructions(), response_format="pcm",
             )
             data = resp.content if hasattr(resp, "content") else await resp.aread()
             cached = False
